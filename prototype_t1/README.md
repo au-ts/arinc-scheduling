@@ -2,8 +2,11 @@ Proof of Concept for ARINC scheduler in Microkit, using the three domain example
 
 Operation of example:
 - Partition 3 prints the values received.
-    - Prints the message from Partition 2 if number is even
-    - Prints the broadcast message from Partition 1 if odd
+    - Prints the message from Partition 2 if number is even (single send, single receive (SS/SR) port
+      messages count up)
+    - Prints the broadcast message from Partition 1 if odd (single send, multiple receive (SS/MR) port
+      messages count down from 1000)
+    - When message from SS/SR == SS/MR (i.e. 500), print different message
 
 Notes:
 - Only periodic processes
