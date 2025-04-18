@@ -11,7 +11,16 @@
 #define P2_SPD_CH_ID 3
 #define P3_SPD_CH_ID 4
 
+#define BASE_PARTITION_EPD_CHANNEL 32
+#define P1_EPD_CH_ID 32
+#define P1_EPD_CH_ID 33
+#define P1_EPD_CH_ID 34
+
 #define NUM_PARTITIONS 3
+
+#define EPD_TIMESLICE 50
+
+#define POST_RECOVERY_PADDING = 10 * NS_IN_MS
 
 /* Partition specific */
 #define P1_LEN 100 * NS_IN_MS
@@ -30,12 +39,38 @@ PARTITION_SHARED_t *partition_state_list[NUM_PARTITIONS] = {0};
 
 /* Partition scheduling management */
 PARTITION_ATTR_t *partition_info_list[NUM_PARTITIONS] = {0};
+
+/* Error partitions */
+PARTITION_ATTR_t *partition_info_list[NUM_PARTITIONS] = {0};
 uint64_t plist_head = 0;
 
 int init_finished = 0;
 
+int first_run = 1;
+
 uint64_t get_next_partition_idx(void) {
-    return plist_head++ % NUM_PARTITIONS;
+    // Error handling partition in between
+    return plist_head++ % (NUM_PARTITIONS * 2);
+}
+
+uint64_t get_prev_partition_idx(void) { 
+    uint64_t curr_head = plist_head;
+    return --curr_head;
+}
+
+/* Get's previous non-error partition idx */
+uint64_t get_prev_normal_partition_idx(void) {
+    uint64_t curr_head = plist_head;
+    if (curr_head > 0) {
+        if (curr_head % 2 == 0) {
+            return curr_head - 2;
+        } else {
+            return curr_head - 1;
+        }
+    } else {
+        /* Return the last non error partition */
+        return (NUM_PARTITIONS - 1) * 2;
+    }
 }
 
 /* Current time allocated for initialisation timeout */
@@ -107,12 +142,37 @@ void notified(microkit_channel ch)
         }
 
         /* Normal operation (init complete )*/
-        int next_partition = get_next_partition_idx();
-        partition_state_list[next_partition]->state = RUNNING; 
-        /* Notify partition channels */
-        microkit_notify(next_partition + PARTITION_CHANNEL_START);
-        sddf_timer_set_timeout(TIMER_CH_ID, partition_info_list[next_partition]->LENGTH);
-        break;
+        int partition_to_run = get_next_partition_idx();
+        /* Error handling follows normal partition*/
+        if (partition_to_run % 2 != 0) {
+            /* Partition Error PD's are odd offsets starting from 1 .. 2n + 1 where n is number of partitions */
+            microkit_notify(BASE_PARTITION_EPD_CHANNEL + ((partition_to_run - 1) / 2));
+            sddf_timer_set_timeout(TIMER_CH_ID, EPD_TIMESLICE);
+            break;
+
+        } else { 
+            /* Notify ePD to bind/unbind from pPD */
+            if (first_run) {
+                first_run = 0;
+            } else {
+                /* Invariant here is that prev_partition_epd_idx is always odd, and the current partition to run has even idx */
+                int prev_partition_epd_idx = get_prev_partition_idx();
+                if ((partition_state_list[get_prev_normal_partition_idx()]->recovering_pd & RECOVERY_MASK) != PPD_RECOVERING) {
+                    /* PPD is not recovering: no need to unbind/rebind, just run padding */
+                    sddf_timer_set_timeout(TIMER_CH_ID, POST_RECOVERY_PADDING);
+                } else {
+                    /* TODO: calling this instruction would have taken some time, pad for that time too? */
+                    microkit_notify(BASE_PARTITION_EPD_CHANNEL + prev_partition_epd_idx);
+                    sddf_timer_set_timeout(TIMER_CH_ID, POST_RECOVERY_PADDING)
+                }                
+            }
+            /* Normal partition PD's are even offsets starting from 0 .. 2n where n is number of partitions */
+            partition_state_list[(partition_to_run / 2)]->state = RUNNING; 
+            /* Notify partition channels */
+            microkit_notify(PARTITION_CHANNEL_START + partition_to_run);
+            sddf_timer_set_timeout(TIMER_CH_ID, partition_info_list[partition_to_run]->LENGTH);
+            break;
+        }
 
     default:
         microkit_dbg_puts("TIMER|ERROR: unexpected channel!\n");

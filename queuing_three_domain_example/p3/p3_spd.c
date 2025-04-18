@@ -18,10 +18,13 @@ PD_STATUS_t *PPD_STATUS;
 void init(void) {
     if (PPD_STATUS->status == READY) { 
         microkit_dbg_puts("P3 PPD READY, Initialising P3 SPD\n");
-        P_STATE->state = READY;
         /* Set port status */
         init_queuing_port(P2_RECV);
         reset_sampling_port(P1_BROADCAST_RECV);
+        /* TODO: some validation of pointer? What range? */
+        P_STATE->ppd_error_hdl = PPD_STATUS->handle_error_fn;
+        /* Ready flag set in ePD */
+        // P_STATE->state = READY;
     } 
 };
 

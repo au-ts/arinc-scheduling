@@ -9,6 +9,7 @@ SAMPLING_PORT_TYPE *P1_BROADCAST_RECV;
 
 void p3_initialize(void);
 void p3_timeTriggered(void);
+void handle_error(void);
 
 int read_p2(void) {
     return receive_queuing_message(P2_RECV);
@@ -21,6 +22,7 @@ int read_broadcast(void) {
 void init(void) {
     microkit_dbg_puts("Initialising P3 PPD\n");
     p3_initialize();
+    STATUS->ppd_error_hdl = &handle_error;
     STATUS->status = READY;
 }
 
@@ -40,3 +42,7 @@ microkit_msginfo protected(microkit_channel channel, microkit_msginfo msginfo) {
 }
 
 void notified(microkit_channel ch) {};
+
+void handle_error(void) {
+    /* Do something */
+}
