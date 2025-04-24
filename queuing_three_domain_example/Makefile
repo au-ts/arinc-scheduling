@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 ifndef MICROKIT_SDK
-	MICROKIT_SDK := /Users/jd/trustworthy-systems/microkit-sdk-1.4.1
+	MICROKIT_SDK := /Users/jd/trustworthy-systems/microkit/release/microkit-sdk-1.4.1
 endif
 
 ifndef SDDF

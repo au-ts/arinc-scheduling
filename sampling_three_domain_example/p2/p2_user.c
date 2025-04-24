@@ -10,8 +10,10 @@ void p2_timeTriggered(void) {
   int privateval = read_p1();
   if (privateval % 2 == 0) {
     send_p3(privateval);
-    printf("P2: Sending even number : %d\n", privateval);
+    sddf_dprintf("P2: Sending even number : %d\n", privateval);
   } else {
-    printf("P2: Blocked odd number : %d\n", privateval);
+    sddf_dprintf("P2: Blocked odd number : %d\n", privateval);
   }
+
+  sddf_dprintf("P1 APD: %d\n", read_p1_apd());
 }

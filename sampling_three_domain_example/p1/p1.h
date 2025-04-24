@@ -2,6 +2,7 @@
 #include "../port.h"
 #include "../interpartitioncomm.h"
 #include "../printf.h"
+#include <sddf/util/printf.h>
 #include <microkit.h>
 
 void send_p2(int message);

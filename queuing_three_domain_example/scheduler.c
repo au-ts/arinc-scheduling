@@ -13,14 +13,14 @@
 
 #define BASE_PARTITION_EPD_CHANNEL 32
 #define P1_EPD_CH_ID 32
-#define P1_EPD_CH_ID 33
-#define P1_EPD_CH_ID 34
+#define P2_EPD_CH_ID 33
+#define P3_EPD_CH_ID 34
 
 #define NUM_PARTITIONS 3
 
 #define EPD_TIMESLICE 50
 
-#define POST_RECOVERY_PADDING = 10 * NS_IN_MS
+#define POST_RECOVERY_PADDING 10 * NS_IN_MS
 
 /* Partition specific */
 #define P1_LEN 100 * NS_IN_MS
@@ -41,7 +41,6 @@ PARTITION_SHARED_t *partition_state_list[NUM_PARTITIONS] = {0};
 PARTITION_ATTR_t *partition_info_list[NUM_PARTITIONS] = {0};
 
 /* Error partitions */
-PARTITION_ATTR_t *partition_info_list[NUM_PARTITIONS] = {0};
 uint64_t plist_head = 0;
 
 int init_finished = 0;

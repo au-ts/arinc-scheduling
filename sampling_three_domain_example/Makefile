@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 ifndef MICROKIT_SDK
-	MICROKIT_SDK := /Users/jd/trustworthy-systems/microkit-sdk-1.4.1
+	MICROKIT_SDK := /Users/jd/trustworthy-systems/microkit/release/microkit-sdk-1.4.1
 endif
 
 ifndef SDDF
@@ -20,7 +20,13 @@ override MICROKIT_SDK := $(abspath ${MICROKIT_SDK})
 
 export BUILD_DIR ?= build
 # By default we make a debug build so that the client debug prints can be seen.
-export MICROKIT_CONFIG ?= debug
+export MICROKIT_CONFIG ?= benchmark
+
+ifeq ($(strip $(TOOLCHAIN)),)
+	TOOLCHAIN := aarch64-none-elf
+	export TOOLCHAIN := aarch64-none-elf
+	export LIBC := $(dir $(realpath $(shell aarch64-none-elf-gcc --print-file-name libc.a)))
+endif
 
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	export ARCH := aarch64
@@ -38,8 +44,8 @@ else
 $(error Unsupported MICROKIT_BOARD given)
 endif
 
-CC := clang
-LD := ld.lld
+CC := $(TOOLCHAIN)-gcc
+LD := $(TOOLCHAIN)-ld
 export MICROKIT_TOOL ?= $(abspath $(MICROKIT_SDK)/bin/microkit)
 
 export BOARD_DIR := $(abspath $(MICROKIT_SDK)/board/$(MICROKIT_BOARD)/$(MICROKIT_CONFIG))

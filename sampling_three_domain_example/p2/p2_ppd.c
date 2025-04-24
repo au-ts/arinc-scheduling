@@ -6,6 +6,7 @@
 volatile SAMPLING_PORT_TYPE *P3_PORT;
 /* Receive Port */
 volatile SAMPLING_PORT_TYPE *P1_RECV;
+volatile SAMPLING_PORT_TYPE *P1_APD_RECV;
 volatile SAMPLING_PORT_TYPE *P1_BROADCAST_RECV;
 
 volatile PD_STATUS_t *STATUS;
@@ -19,6 +20,9 @@ void send_p3(int message) {
 
 int read_p1(void) {
     return read_from_port(P1_RECV);
+}
+int read_p1_apd(void) {
+    return read_from_port(P1_APD_RECV);
 }
 int read_broadcast(void) {
     return read_from_port(P1_BROADCAST_RECV);
@@ -34,6 +38,7 @@ microkit_msginfo protected(microkit_channel channel, microkit_msginfo msginfo) {
     switch (channel) {
         case SPD_CH_ID:    
             /* Run periodic application code */
+            microkit_dbg_puts("PPD P2");
             p2_timeTriggered();
             break;
         

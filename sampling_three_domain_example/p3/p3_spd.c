@@ -18,7 +18,7 @@ volatile PD_STATUS_t *PPD_STATUS;
 void init(void) {
     if (PPD_STATUS->status == READY) { 
         microkit_dbg_puts("P3 PPD READY, Initialising P3 SPD\n");
-        P_STATE->state = READY;
+        // P_STATE->state = READY;
         /* Set port status */
         reset_port(P2_RECV);
         reset_port(P1_BROADCAST_RECV);
@@ -35,6 +35,7 @@ void notified(microkit_channel ch) {
         check_set_message(P2_SEND_PORT, P2_RECV);
         check_set_message(P1_BROADCAST_PORT,P1_BROADCAST_RECV);
 
+        sddf_dprintf("Calling P3 pPD\n");
         /* Invoke pPD (donate scheduling context)*/
         microkit_ppcall(PPD_CH_ID, microkit_msginfo_new(0,0));
 
