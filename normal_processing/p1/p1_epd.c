@@ -40,7 +40,6 @@ void notified(microkit_channel ch) {
                 init_finished = 1;
                 return;
             }
-            // microkit_dbg_puts("P1 ePD 1\n");
             /* Handling overruns */
             if (PPD_STATUS->status == RUNNING) {
                 // microkit_dbg_puts("P1 ePD 2\n");
@@ -75,10 +74,8 @@ void notified(microkit_channel ch) {
             /* Otherwise it's the aPD that's overrun (which is normal case)*/
             /* aPD has full SC so dont need to bind/unbind, just set PC to */
             /* recovery function and yield */
-                // microkit_dbg_puts("P1 ePD 3\n");
                 P_STATE->recovering_pd = APD_RECOVERING;
                 APD_STATUS->status = RECOVER;
-                // sddf_dprintf("PC: %p\n", P_STATE->apd_error_hdl);
                 microkit_pd_restart(APD_ID, (uintptr_t) P_STATE->apd_error_hdl);
                 return;
             } else {

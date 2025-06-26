@@ -20,7 +20,7 @@ override MICROKIT_SDK := $(abspath ${MICROKIT_SDK})
 
 export BUILD_DIR ?= build
 # By default we make a debug build so that the client debug prints can be seen.
-export MICROKIT_CONFIG ?= benchmark
+export MICROKIT_CONFIG ?= debug
 
 ifeq ($(strip $(TOOLCHAIN)),)
 	TOOLCHAIN := aarch64-none-elf
