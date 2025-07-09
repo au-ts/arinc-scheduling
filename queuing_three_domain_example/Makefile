@@ -7,6 +7,12 @@ ifndef MICROKIT_SDK
 	MICROKIT_SDK := /Users/jd/trustworthy-systems/microkit-sdk-1.4.1
 endif
 
+ifndef LIBMICROKITCO_PATH
+	LIBMICROKITCO_PATH:= /Users/jd/trustworthy-systems/libmicrokitco
+endif
+LIBMICROKITCO_OPT_PATH := $(shell pwd)
+LIBMICROKITCO_OBJ := $(BUILD_DIR)/libmicrokitco/libmicrokitco_aarch64-unknown-linux-gnu.a
+
 ifndef SDDF
 	export SDDF := /Users/jd/trustworthy-systems/sddf
 endif

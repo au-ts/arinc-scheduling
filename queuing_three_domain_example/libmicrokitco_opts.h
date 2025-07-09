@@ -1,0 +1,1 @@
+const int LIBMICROKITCO_MAX_COTHREADS = 3;

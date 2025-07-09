@@ -3,12 +3,16 @@
 int value = 0;
 int broadcast_val = 1000;
 
-void p1_initialize(void) {
+void p1_pco_initialize(void) {
   // add initialization code here
-  printf("Setting initial value: %d\n", value);
+  printf("P1 PCO INIT\n");
   send_p2(value);
-  printf("Setting initial broadcast: %d\n", broadcast_val);
   broadcast(broadcast_val); 
+}
+
+void p1_aco_initialize(void) {
+  // add initialization code here
+  printf("P1 ACO INIT\n");
 }
 
 void p1_timeTriggered(void) {

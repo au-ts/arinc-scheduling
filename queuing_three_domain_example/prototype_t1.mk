@@ -14,7 +14,8 @@ ifndef TOOLCHAIN
 	endif
 endif
 
-TOOLCHAIN := aarch64-unknown-linux-gnu
+TARGET := aarch64-unknown-linux-gnu
+TOOLCHAIN := $(TARGET)
 CC := $(TOOLCHAIN)-gcc
 LD := $(TOOLCHAIN)-ld
 AS := $(TOOLCHAIN)-as
@@ -22,12 +23,18 @@ AR := $(TOOLCHAIN)-ar
 RANLIB := $(TOOLCHAIN)-ranlib
 
 
+export LIBMICROKITCO_PATH TARGET MICROKIT_SDK BUILD_DIR MICROKIT_BOARD MICROKIT_CONFIG CPU TOOLCHAIN
+
+$(LIBMICROKITCO_OBJ):
+	make -f $(LIBMICROKITCO_PATH)/Makefile
+
+
 TIMER_DRIVER := $(SDDF)/drivers/timer/$(TIMER_DRIVER_DIR)
 
 include ${TIMER_DRIVER}/timer_driver.mk
 include ${SDDF}/util/util.mk
 
-IMAGES := p1_ppd.elf p1_spd.elf p2_ppd.elf p2_spd.elf p3_ppd.elf p3_spd.elf scheduler.elf timer_driver.elf
+IMAGES := p1_upd.elf p1_spd.elf p2_ppd.elf p2_spd.elf p3_ppd.elf p3_spd.elf scheduler.elf timer_driver.elf
 # Note that these warnings being disabled is to avoid compilation errors while in the middle of completing each exercise part
 CFLAGS := -mcpu=$(CPU) -mstrict-align -nostdlib -ffreestanding -g -Wall -Wno-array-bounds -Wno-unused-variable -Wno-unused-function -Werror -I$(BOARD_DIR)/include -I$(SDDF)/include -Iinclude -DBOARD_$(BOARD)
 LDFLAGS := -L$(BOARD_DIR)/lib
@@ -69,7 +76,7 @@ qemu: $(IMAGE_FILE)
 
 PRINTF_OBJS := printf.o util.o
 INTERPARTITION_COMM_OBJS := $(PRINTF_OBJS) interpartitioncomm.o 
-P1_USER_OBJS := $(INTERPARTITION_COMM_OBJS) p1_user.o p1_ppd.o
+P1_USER_OBJS := $(INTERPARTITION_COMM_OBJS) p1_user.o p1_upd.o
 P2_USER_OBJS := $(INTERPARTITION_COMM_OBJS) p2_user.o p2_ppd.o
 P3_USER_OBJS := $(INTERPARTITION_COMM_OBJS) p3_user.o p3_ppd.o
 
@@ -92,7 +99,7 @@ all: directories $(IMAGE_FILE)
 
 # P1 #
 
-p1_ppd.elf: $(P1_USER_OBJS)
+p1_upd.elf: $(P1_USER_OBJS) $(LIBMICROKITCO_OBJ)
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 p1_spd.elf: $(P1_SPD_OBJS)
