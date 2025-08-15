@@ -11,6 +11,11 @@
 #define P2_SPD_CH_ID 3
 #define P3_SPD_CH_ID 4
 
+#define BASE_PARTITION_TCB_ID 1
+#define P1_UPD_TCB_ID 1
+#define P2_UPD_TCB_ID 2
+#define P3_UPD_TCB_ID 3
+
 #define NUM_PARTITIONS 3
 
 /* Partition specific */
@@ -18,15 +23,15 @@
 #define P2_LEN 100 * NS_IN_MS
 #define P3_LEN 100 * NS_IN_MS
 
-PARTITION_SHARED_t *p1_state;
-PARTITION_SHARED_t *p2_state;
-PARTITION_SHARED_t *p3_state;
+partition_internal *p1_state;
+partition_internal *p2_state;
+partition_internal *p3_state;
 
 PARTITION_ATTR_t *p1_attr;
 PARTITION_ATTR_t *p2_attr;
 PARTITION_ATTR_t *p3_attr;
 
-PARTITION_SHARED_t *partition_state_list[NUM_PARTITIONS] = {0};
+partition_internal *partition_state_list[NUM_PARTITIONS] = {0};
 
 /* Partition scheduling management */
 PARTITION_ATTR_t *partition_info_list[NUM_PARTITIONS] = {0};
@@ -36,6 +41,10 @@ int init_finished = 0;
 
 uint64_t get_next_partition_idx(void) {
     return plist_head++ % NUM_PARTITIONS;
+}
+
+uint64_t get_curr_partition_idx(void) {
+    return plist_head % NUM_PARTITIONS;
 }
 
 /* Current time allocated for initialisation timeout */
@@ -107,6 +116,12 @@ void notified(microkit_channel ch)
         }
 
         /* Normal operation (init complete )*/
+
+        int curr_partition = get_curr_partition_idx();
+
+        /* TCB suspend current (previous) partition */
+        seL4_TCB_Suspend(BASE_PARTITION_TCB_ID + curr_partition);
+
         int next_partition = get_next_partition_idx();
         partition_state_list[next_partition]->state = RUNNING; 
         /* Notify partition channels */

@@ -3,10 +3,12 @@
 #include "printf.h"
 #include <string.h>
 #include <microkit.h>
+#include "partition.h"
 
 #define ERR_BUF_FULL -1
 #define ERR_BUF_EMPTY -1
 #define ERR_MSG_INVALID -2
+#define ERR_BUF_INVALID -3
 
 void check_set_message(SAMPLING_PORT_TYPE *from, SAMPLING_PORT_TYPE *to);
 void reset_sampling_port(SAMPLING_PORT_TYPE *port);
@@ -18,6 +20,7 @@ int read_sampling_message(SAMPLING_PORT_TYPE *port);
 /* Return -1 on port full */
 int send_queuing_message(QUEUING_PORT_TYPE *port, int message);
 /* Return ERR_BUF_FULL on port full, ERR_MSG_INVALID on message invalid */
-int receive_queuing_message(QUEUING_PORT_TYPE *port);
+/* Can set num_retries for aCo to retry if empty, should be 0 for pCo */
+int receive_queuing_message(QUEUING_PORT_TYPE *port, QUEUE_MSG *output_buf, process_internal *caller, int num_retries);
 
 void transfer_queuing_buffers(QUEUING_PORT_TYPE *from, QUEUING_PORT_TYPE *to);

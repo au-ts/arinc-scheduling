@@ -1,13 +1,31 @@
 #include "p2.h"
 
-static int application_buf[QUEUING_BUFFER_LEN] = {0};
+extern process_internal *aco_status;
 
-void p2_initialize(void) {
-  // add initialization code here
-  printf("P2: INIT USER APPLICATION\n");
+void send_p3(int message) {
+  send_queuing_message(P3_PORT, message);
 }
 
-void p2_timeTriggered(void) {
+int read_p1(void) {
+  return read_sampling_message(P1_RECV);
+}
+int read_broadcast(void) {
+  return read_sampling_message(P1_BROADCAST_RECV);
+}
+
+static int application_buf[QUEUING_BUFFER_LEN] = {0};
+
+void pco_initialize(void) {
+  // add initialization code here
+  printf("P2: init pCo\n");
+}
+
+void aco_initialize(void) {
+  // add initialization code here
+  printf("P2: init aCo\n");
+}
+
+void periodic(void) {
   // add compute phase code here
   int privateval = read_p1();
   if (privateval && privateval % QUEUING_BUFFER_LEN == 0) {
@@ -21,4 +39,8 @@ void p2_timeTriggered(void) {
   } else {
     application_buf[(privateval % QUEUING_BUFFER_LEN) - 1] = privateval;
   }
+}
+
+void aperiodic(void) {
+  // something
 }

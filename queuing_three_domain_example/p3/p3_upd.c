@@ -1,13 +1,11 @@
-#include "p1.h"
-#include "p1_config.h"
+#include "p3.h"
+#include "p3_config.h"
 #include "upd_types.h"
 
 /* Below here is generic for all partitions */
 
 /* Buffer for message */
 QUEUE_MSG buf = {0};
-
-int first_run = 0;
 
 process_internal *status;
 
@@ -25,7 +23,7 @@ void pco_recovery() {
     microkit_cothread_yieldto(ROOT_COTHREAD_REF);
 }
 
-void aco_handle() {
+void aco_recovery() {
     /* Yield to root co-thread */
     microkit_cothread_yieldto(ROOT_COTHREAD_REF);
 
@@ -39,6 +37,7 @@ void aco_handle() {
 }
 
 void pco_entry() {
+    status->pco_status = RUNNING;
     periodic();
 }
 
@@ -64,19 +63,19 @@ void init(void) {
         stack_ptrs
     );
 
-    pco_status->entry_point = &pco_entry;
-    aco_status->entry_point = &aco_entry;
+    status->pco_entry_point = &pco_entry;
+    status->aco_entry_point = &aco_entry;
 
-    pco_status->recovery_fn = &pco_recovery;
-    aco_status->recovery_fn = &aco_recovery;
+    status->pco_recovery_fn = &pco_recovery;
+    status->aco_recovery_fn = &aco_recovery;
 
-    pco_status->status = READY;
-    aco_status->status = READY;
+    status->pco_status = READY;
+    status->aco_status = READY;
 
     // WARNING
-    microkit_cothread_ref_t aco = microkit_cothread_spawn(aco_status->entry_point, ACO_ID);
+    microkit_cothread_ref_t aco = microkit_cothread_spawn(status->aco_entry_point, ACO_ID);
 
-    aco_status->cothread_ref = aco;
+    status->aco_cothread_ref = aco;
 
     // Any init
 
@@ -94,13 +93,6 @@ microkit_msginfo protected(microkit_channel channel, microkit_msginfo msginfo) {
 void notified(microkit_channel ch) {
     switch (ch) {
         case SPD_CH_ID: { 
-            // If first time running, save pCo SP (which is SP after it finished init)
-            if (first_run) {
-                status->pco_sp_after_init = microkit_get_cothread_sp(status->pco_cothread_ref);
-                first_run = 0;
-            }
-
-
             /* Basically we also need to restore the aCo registers before we switch to it. */
             /* This could either be when it finishes reading messages */
             /* Or when it is scheduled after pCo*/
@@ -112,28 +104,18 @@ void notified(microkit_channel ch) {
                 microkit_cothread_yieldto(aco_status->cothread_ref);
             }
 
-            // /* Spawn pCo */
-            // microkit_cothread_ref_t pco = microkit_cothread_spawn(pco_status->entry_point, PCO_ID);
-            // pco_status->cothread_ref = pco;
-            // pco_status->status = ready;
-
-            /* Reset pCo SP and PC */
-            /* DANGER CHECK */
-            if (!first_run) {
-                microkit_set_cothread_sp(status->pco_cothread_ref, status->pco_sp_after_init);
-                microkit_set_cothread_pc(status->pco_cothread_ref, pco_entry)
-            }
- 
+            /* Spawn pCo */
+            microkit_cothread_ref_t pco = microkit_cothread_spawn(pco_status->entry_point, PCO_ID);
+            status->pco_cothread_ref = pco;
+            status->pco_status = READY;
 
             /* Run periodic application code */
-            pco_status->status = RUNNING;
-            microkit_cothread_yieldto(pco_status->cothread_ref);
+            microkit_cothread_yieldto(status->pco_cothread_ref);
             /* Destroy pCo upon finish */
-            microkit_cothread_destroy(pco_status->cothread_ref);
+            microkit_cothread_destroy(status->pco_cothread_ref);
+
             /* Check if pCo was recoverying */
-            if (status->pco_status == RECOVER) { 
-                status->pco_status = READY;
-                /* Unblock the sPD */
+            if (pco_status->status == RECOVER) { 
                 break;
             }
 

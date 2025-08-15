@@ -1,5 +1,5 @@
-#include "p1.h"
-#include "p1_config.h"
+#include "p2.h"
+#include "p2_config.h"
 
 #define SPD_ID 1
 #define UPD_ID 2
@@ -24,18 +24,19 @@ void init(void) {
 
 void notified(microkit_channel ch) {
     switch (ch) {
+
         /* Init */
         case SCHEDULER_CH_ID: {
             /* Assign error handling functions after the PPD, SPD, APD have run */
             if (!init_finished) {
                 microkit_dbg_puts("P1 ePD Initialising!\n");
-                // if (pco_status->recovery_fn != 0) {
-                //     partition_state->ppd_error_hdl = pco_status->recovery_fn;
-                // }
-                // if (aco_status->recovery_fn != 0) {
-                //     partition_state->apd_error_hdl = aco_status->recovery_fn;
-                // }
-                partition_state->state = READY;
+                if (pco_status->handle_error_fn != 0) {
+                    P_STATE->ppd_error_hdl = PPD_STATUS->handle_error_fn;
+                }
+                if (aco_status->handle_error_fn != 0) {
+                    P_STATE->apd_error_hdl = APD_STATUS->handle_error_fn;
+                }
+                P_STATE->state = READY;
                 init_finished = 1;
                 return;
             }
@@ -49,21 +50,20 @@ void notified(microkit_channel ch) {
 
                 partition_state->state = RECOVER;
                 partition_state->upd_state = RECOVER;
-                // pco_status->status = RECOVER;               
+                pco_status->status = RECOVER;               
 
                 // WARNING check recovery_fn
                 // Set PC of PPD to error handler function it registered
-                microkit_pd_restart(UPD_TCB_ID, (seL4_Word) upd_status->pco_recovery_fn);
-
+                microkit_pd_restart(UPD_ID, (seL4_Word) PPD_STATUS->recovery_fn);
 
                 /* Resume uPD TCB */
-                seL4_TCB_Resume(UPD_TCB_ID);
+                seL4_TCB_Resume();
 
                 return;
 
             } else if (pco_status == RECOVER) {
                 /* If already recovering, just let uPD continue */
-                seL4_TCB_Resume(UPD_TCB_ID);
+                seL4_TCB_Resume();
                 printf("Continuing uPD recovery!\n");
                 break;
 

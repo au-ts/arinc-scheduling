@@ -1,7 +1,10 @@
 #include "p1.h"
+#include "p1_config.h"
 
+#define TIMER_CH_ID 1
 #define SCHEDULER_CH_ID 2
-#define UPD_CH_ID 5
+#define EPD_CH_ID 3
+#define UPD_CH_ID 4
 
 /* PORTS */
 SAMPLING_PORT_TYPE *SEND_P2_PORT;
@@ -9,8 +12,14 @@ SAMPLING_PORT_TYPE *SEND_ALL_PORT;
 
 /* PARTITION INFO */
 
-partition_internal *P_STATE;
-process_internal *PPD_STATUS;
+partition_internal *partition_state;
+/* TODO map memory for aco_status/pco_status */
+process_internal *upd_status;
+
+/* TODO map memory for regs */
+seL4_UserContext *aco_regs;
+
+int aco_flag = 0;
 
 
 void init(void) {
@@ -26,17 +35,69 @@ void init(void) {
 void notified(microkit_channel ch) {
     switch (ch) {
     /* Start of partition time slice */
-    case SCHEDULER_CH_ID:
-        /* Fill message queue */
-        
-        /* Set default, empty and invalid */
-        /* We assume pPD follow protocol and sets message to be valid + full */
-        reset_sampling_port(SEND_P2_PORT);
-        reset_sampling_port(SEND_ALL_PORT);
+        case SCHEDULER_CH_ID: {
 
-        P_STATE->state = RUNNING;
-        /* Invoke pPD (donate scheduling context)*/
-        microkit_ppcall(UPD_CH_ID, microkit_msginfo_new(0,0));
+            /* Check if partition overrun, and signal ePD instead */
+            if (upd_status->pco_status == RUNNING || upd_status->pco_status == RECOVER) {
+                microkit_notify(EPD_CH_ID);
+                break;
+            }
+
+            /* Timeout for partition setup */
+            sddf_timer_set_timeout(TIMER_CH_ID, PARTITION_SETUP_TIME);
+
+            /* Interpartition Communication Semantics */
+
+            /* Set default, empty and invalid */
+            /* We assume pPD follow protocol and sets message to be valid + full */
+            reset_sampling_port(SEND_P2_PORT);
+            reset_sampling_port(SEND_ALL_PORT);
+    
+            /* If the aCo running (normal operation after first-run), cleanup uPD */
+            if (upd_status->aco_status == RUNNING) {
+                /* Assume suspend has been done by scheduler */
+                
+                /* Save registers of the uPD */
+                seL4_TCB_ReadRegisters(BASE_TCB_CAP + UPD_TCB_ID, seL4_False, 0, NUM_REG_SAVE, aco_regs); // Save current PC of Client
+
+                /* Resume uPD from aCo handling fn */
+                microkit_pd_restart(UPD_TCB_ID, (seL4_Word) upd_status->aco_recovery_fn);
+
+                /* Resume the suspended uPD */
+                seL4_TCB_Resume(BASE_TCB_CAP + UPD_TCB_ID);
+            }
+            
+            break;
+        }
+
+        case TIMER_CH_ID: {
+        /* Partition setup complete */ 
+            partition_state->state = RUNNING;
+            if (upd_status->aco_status != READY) {
+                printf("ERROR!: aCo did not finish handling!\n");
+                break;
+            } 
+            /* Notify uPD's root co-thread */
+            microkit_notify(UPD_CH_ID);
+
+            break;
+        }
+
+        case UPD_CH_ID: {
+            /* If not enough time remaining to restore registers, and yield, set flag and skip */
+            // if (!(sddf_timer_time_now(TIMER_CH_ID))) {
+            //     aco_flag = 1;
+            //     break;
+            // }
+
+            /* Restore aCo registers */
+            seL4_TCB_WriteRegisters(BASE_TCB_CAP + UPD_ID, seL4_False, 0, NUM_REG_SAVE, aco_regs); 
+            /* Reset saved aCo context */
+            aco_regs = {0};
+            aco_status->status = READY;
+
+            break;
+        }
     }
 };
 

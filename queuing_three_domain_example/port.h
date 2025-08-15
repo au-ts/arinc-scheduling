@@ -17,7 +17,7 @@ typedef struct {
 
 typedef struct {
     int data;
-    PORT_STATUS_TYPE status; /* Used to indicate message has been moved atomically */
+    PORT_STATUS_TYPE status; /* Used to indicate integrity of message */
 } QUEUE_MSG;
 
 typedef struct {

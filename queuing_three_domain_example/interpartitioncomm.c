@@ -1,4 +1,6 @@
 #include "interpartitioncomm.h"
+#include "partition.h"
+#include "upd_types.h"
 #include "port.h"
 
 void check_set_message(SAMPLING_PORT_TYPE *from, SAMPLING_PORT_TYPE *to) {
@@ -55,11 +57,26 @@ int send_queuing_message(QUEUING_PORT_TYPE *port, int message) {
     return 0;
 }
 
-int receive_queuing_message(QUEUING_PORT_TYPE *port) {
-    /* Exit on empty buffer */
-    if (port->size == 0) {
+int receive_queuing_message(QUEUING_PORT_TYPE *port, QUEUE_MSG *output_buf, process_internal *caller, int num_retries) {
+    if (output_buf == NULL) {
+        printf("ERROR: invalid output_buf!\n");
+        return ERR_BUF_INVALID;
+    }
+    /* Retry if empty (num_retries should be 0 for pCo) */
+    while (num_retries > 0) {
+        if (port->size == 0) {
+            --num_retries;
+            microkit_cothread_yieldto(ROOT_COTHREAD_REF);
+        } else {
+            break;
+        }
+    }
+    /* Exit on empty buffer and no retries remaining */
+    if (num_retries == 0 && port->size == 0) {
         return ERR_BUF_EMPTY;
     }
+    /* Start Critical Section */
+    caller->critical_section = 1;
     QUEUE_MSG msg = port->buffer[port->head];
     if (msg.status == INVALID) {
         return ERR_MSG_INVALID;
@@ -68,8 +85,15 @@ int receive_queuing_message(QUEUING_PORT_TYPE *port) {
     port->buffer[port->head].data = 0;
     port->head = (port->head + 1) % port->max_len;
     --port->size;
-
-    return msg.data;
+    *output_buf = msg;
+    caller->critical_section = 0;
+    /* End Critical Section */
+    /* Need to check flag for preempted and yield if I am aCo */
+    if (caller->cothread_ref == ACO_ID && caller->preempted) {
+        caller->preempted = 0;
+        microkit_cothread_yieldto(ROOT_COTHREAD_REF);
+    }
+    return 0;
 }
 
 void transfer_queuing_buffers(QUEUING_PORT_TYPE *from, QUEUING_PORT_TYPE *to) {

@@ -1,6 +1,8 @@
 #include "p3.h"
 
-#define SCHEDULER_CH_ID 4
+
+#define TIMER_CH_ID 1
+#define SCHEDULER_CH_ID 2
 #define PPD_CH_ID 7
 
 /* CHANNEL PORT (Send of another partition) */
@@ -12,8 +14,13 @@ QUEUING_PORT_TYPE *P2_RECV;
 SAMPLING_PORT_TYPE *P1_BROADCAST_RECV;
 
 /* PARTITION INFO */
-PARTITION_SHARED_t *P_STATE;
-PD_STATUS_t *PPD_STATUS;
+
+partition_internal *partition_state;
+/* TODO map memory for aco_status/pco_status */
+process_internal *upd_status;
+
+/* TODO map memory for regs */
+seL4_UserContext *aco_regs;
 
 void init(void) {
     if (PPD_STATUS->status == READY) { 
@@ -29,6 +36,9 @@ void notified(microkit_channel ch) {
     switch (ch) {
     /* Start of partition time slice */
     case SCHEDULER_CH_ID:
+
+        /* Timeout for partition setup */
+        sddf_timer_set_timeout(TIMER_CH_ID, PARTITION_SETUP_TIME);
 
         /* Input processing from P2 send buffer to P3 receive buffer */
         transfer_queuing_buffers(P2_SEND_PORT, P2_RECV);
