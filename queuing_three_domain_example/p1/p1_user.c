@@ -40,3 +40,8 @@ void aperiodic(void) {
     ++sum;
   }
 }
+
+void periodic_init(void) {
+}
+
+void aperiodic_init(void) {}

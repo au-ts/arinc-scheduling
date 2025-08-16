@@ -89,7 +89,8 @@ int receive_queuing_message(QUEUING_PORT_TYPE *port, QUEUE_MSG *output_buf, proc
     caller->critical_section = 0;
     /* End Critical Section */
     /* Need to check flag for preempted and yield if I am aCo */
-    if (caller->cothread_ref == ACO_ID && caller->preempted) {
+    /* This should only be set if caller was aCo */
+    if (caller->preempted) {
         caller->preempted = 0;
         microkit_cothread_yieldto(ROOT_COTHREAD_REF);
     }

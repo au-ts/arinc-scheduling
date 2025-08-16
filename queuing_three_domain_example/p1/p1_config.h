@@ -2,6 +2,7 @@
 #include "../port.h"
 
 #define SPD_CH_ID 5
+#define SPD_INIT_CH_ID 6
 #define UPD_TCB_ID 1
 
 /* WCET of sPD implementing interpartition communication, and handling uPD */

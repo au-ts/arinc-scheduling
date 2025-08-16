@@ -13,35 +13,17 @@
 partition_internal *partition_state;
 process_internal *upd_status;
 
+/*  for pCo */
+seL4_UserContext *pco_ctxt;
+
 int init_finished = 0;
 
 void init(void) {
     sddf_dprintf("In ePD 1 init\n");
-    /* User spare SC */
-    microkit_dbg_puts("P1 ePD setting state to NOT_READY\n");
-    P_STATE->state = NOT_READY;
 };
 
 void notified(microkit_channel ch) {
     switch (ch) {
-        /* Init */
-        case SCHEDULER_CH_ID: {
-            /* Assign error handling functions after the PPD, SPD, APD have run */
-            if (!init_finished) {
-                microkit_dbg_puts("P1 ePD Initialising!\n");
-                // if (pco_status->recovery_fn != 0) {
-                //     partition_state->ppd_error_hdl = pco_status->recovery_fn;
-                // }
-                // if (aco_status->recovery_fn != 0) {
-                //     partition_state->apd_error_hdl = aco_status->recovery_fn;
-                // }
-                partition_state->state = READY;
-                init_finished = 1;
-                return;
-            }
-            break;
-        }
-
         /* Handling pCo overruns */
         case SPD_CH_ID: {
             if (pco_status->status == RUNNING) { 
@@ -74,6 +56,12 @@ void notified(microkit_channel ch) {
             
 
 
+            break;
+        }
+
+        case UPD_CH_ID: {
+            /* Restore aCo registers */
+            seL4_TCB_WriteRegisters(BASE_TCB_CAP + UPD_ID, seL4_False, 0, NUM_REG_SAVE, pco_ctxt); 
             break;
         }
   

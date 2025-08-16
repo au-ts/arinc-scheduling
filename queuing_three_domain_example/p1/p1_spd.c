@@ -5,6 +5,7 @@
 #define SCHEDULER_CH_ID 2
 #define EPD_CH_ID 3
 #define UPD_CH_ID 4
+#define UPD_PCO_INIT_CH 5
 
 /* PORTS */
 SAMPLING_PORT_TYPE *SEND_P2_PORT;
@@ -19,16 +20,17 @@ process_internal *upd_status;
 /* TODO map memory for regs */
 seL4_UserContext *aco_regs;
 
+seL4_UserContext *pco_ctxt;
+
 int aco_flag = 0;
 
 
 void init(void) {
     if (PPD_STATUS->status == READY) { 
         microkit_dbg_puts("P1 PPD READY, Initialising P1 SPD\n");
-        P_STATE->state = READY;
-        /* Set init port status */
-        reset_sampling_port(SEND_P2_PORT);
-        reset_sampling_port(SEND_ALL_PORT);
+        partition_state->state = READY;
+
+        /* Initialise ports */
     }
 };
 
@@ -47,11 +49,6 @@ void notified(microkit_channel ch) {
             sddf_timer_set_timeout(TIMER_CH_ID, PARTITION_SETUP_TIME);
 
             /* Interpartition Communication Semantics */
-
-            /* Set default, empty and invalid */
-            /* We assume pPD follow protocol and sets message to be valid + full */
-            reset_sampling_port(SEND_P2_PORT);
-            reset_sampling_port(SEND_ALL_PORT);
     
             /* If the aCo running (normal operation after first-run), cleanup uPD */
             if (upd_status->aco_status == RUNNING) {
@@ -98,6 +95,11 @@ void notified(microkit_channel ch) {
 
             break;
         }
+
+        case UPD_PCO_INIT_CH: {
+            /* pCo has finished its init. Save its context */
+            seL4_TCB_ReadRegisters(BASE_TCB_CAP + UPD_ID, seL4_False, 0, NUM_REG_SAVE, pco_ctxt);
+        } 
     }
 };
 
