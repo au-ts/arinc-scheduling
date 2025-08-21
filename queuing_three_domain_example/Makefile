@@ -4,7 +4,7 @@
 # SPDX-License-Identifier: BSD-2-Clause
 #
 ifndef MICROKIT_SDK
-	MICROKIT_SDK := /Users/jd/trustworthy-systems/microkit-sdk-1.4.1
+	MICROKIT_SDK := /Users/jd/trustworthy-systems/microkit/release/microkit-sdk-1.4.1
 endif
 
 ifndef LIBMICROKITCO_PATH
@@ -12,11 +12,15 @@ ifndef LIBMICROKITCO_PATH
 endif
 LIBMICROKITCO_OPT_PATH := $(shell pwd)
 LIBMICROKITCO_OBJ := $(BUILD_DIR)/libmicrokitco/libmicrokitco_aarch64-unknown-linux-gnu.a
+export LIBMICROKITCO_OPT_PATH
+# export LIBMICROKITCO_OBJ
+export LIBMICROKITCO_PATH
 
 ifndef SDDF
 	export SDDF := /Users/jd/trustworthy-systems/sddf
 endif
 BOARD := qemu_virt_aarch64
+# BOARD := odroidc4
 export MICROKIT_BOARD := ${BOARD}
 
 ifeq ($(strip $(MICROKIT_SDK)),)
@@ -30,7 +34,7 @@ export MICROKIT_CONFIG ?= debug
 
 ifeq ($(strip $(MICROKIT_BOARD)), odroidc4)
 	export ARCH := aarch64
-	export TIMER_DRIVER_DIR := meson
+	export TIMER_DRIVER_DIR := arm
 	export CPU := cortex-a55
 else ifeq ($(strip $(MICROKIT_BOARD)), qemu_virt_aarch64)
 	export ARCH := aarch64

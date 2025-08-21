@@ -1,6 +1,6 @@
 #include "p2.h"
-#include "p2_config.h"
 #include "upd_types.h"
+#include "upd_shared.h"
 
 /* Below here is generic for all partitions */
 
@@ -9,18 +9,58 @@ QUEUE_MSG buf = {0};
 
 process_internal *status;
 
-partition_internal *partition_state;
+char * pco_stack;
+char * aco_stack;
+
+uintptr_t uart_base;
+
+#define UART_REG(x) ((volatile uint32_t *)(uart_base + (x)))
+// #define UART_BASE 0x10004000
+#define UART_WFIFO 0x0
+#define UART_STATUS 0xC
+#define UART_TX_FULL (1 << 21)
+
+static void uart_init() {}
+
+static void putc(uint8_t ch)
+{
+    while ((*UART_REG(UART_STATUS) & UART_TX_FULL));
+    *UART_REG(UART_WFIFO) = ch;
+}
+
+static void putstr(const char *s)
+{
+    while (*s) {
+        putc((uint8_t)*s++);
+    }
+}
+
+static void print_cycle(ccnt_t s, ccnt_t e, char flag) {
+    // printf("NUMBER CYCLES = %d\n", e - s);
+    char buf[128];
+    snprintf(buf, sizeof(buf), "%c :Number cycles = %llu\n", flag, (unsigned long long) (e - s));
+    putstr(buf);
+}
+
+ccnt_t start;
+ccnt_t end;
+
+co_control_t co_control_mem;
 
 void periodic_recovery(void);
 
 void periodic(void);
-
 void aperiodic(void);
+
+void periodic_init(void);
+void aperiodic_init(void);
 
 void pco_recovery() {
     /* Do any handling actions as pCo will be destroyed when it yields. */
     periodic_recovery();
     microkit_cothread_yieldto(ROOT_COTHREAD_REF);
+    /* Notify ePD to restore the post-initialisation state of the pCo */
+    microkit_notify(EPD_CH_ID);
 }
 
 void aco_handle() {
@@ -29,32 +69,48 @@ void aco_handle() {
 
     /* After regaining control, signal ePD to restore registers*/
     /* i.e. back to where it was before it was preempted */
+    microkit_dbg_puts("Signal sPD to restore aCo\n");
     microkit_notify(SPD_CH_ID);
+    while(1){};
+    microkit_dbg_puts("Shouldn't get here\n");
 
     /* Since the ePD is ready/schedulable and strictly higher prio */
     /* The context switch is immediate, so any lines after notify do not execute*/
     /* Importantly, this function will not return. */
 }
 
+void pco_init_entry() {
+    periodic_init();
+    microkit_cothread_yieldto(ROOT_COTHREAD_REF);
+}
+
+void aco_init_entry() {
+    aperiodic_init();
+    microkit_cothread_yieldto(ROOT_COTHREAD_REF);
+}
+
 void pco_entry() {
-    periodic();
+    /* Post-init */
+    while (1) {
+        periodic();
+        microkit_dbg_puts("Periodic finished, yielding\n");
+        microkit_cothread_yieldto(ROOT_COTHREAD_REF);
+    }
 }
 
 void aco_entry() {
+    // microkit_cothread_yieldto(ROOT_COTHREAD_REF);
+
     aperiodic();
 }
 
 
 void init(void) {
-    microkit_dbg_puts("Initialising P1 uPD\n");
-
-    // old
-    user_init();
-    //
+    microkit_dbg_puts("Initialising P2 uPD\n");
 
     stack_ptrs_arg_array_t stack_ptrs = {
-        (uintptr_t) &stack1,
-        (uintptr_t) &stack2,
+        (uintptr_t) pco_stack,
+        (uintptr_t) aco_stack,
     };
     microkit_cothread_init(
         &co_control_mem, 
@@ -62,22 +118,49 @@ void init(void) {
         stack_ptrs
     );
 
-    pco_status->entry_point = &pco_entry;
-    aco_status->entry_point = &aco_entry;
+    status->pco_entry_point = &pco_entry;
+    status->aco_entry_point = &aco_entry;
 
-    pco_status->recovery_fn = &pco_recovery;
-    aco_status->recovery_fn = &aco_recovery;
+    status->pco_recovery_fn = &pco_recovery;
+    status->aco_recovery_fn = &aco_handle;
 
-    pco_status->status = READY;
-    aco_status->status = READY;
+    status->pco_status = READY;
+    status->aco_status = READY;
 
     // WARNING
-    microkit_cothread_ref_t aco = microkit_cothread_spawn(aco_status->entry_point, ACO_ID);
+    microkit_cothread_ref_t pco = microkit_cothread_spawn(&pco_init_entry, (void *) PCO_ID);
 
-    aco_status->cothread_ref = aco;
+    microkit_cothread_ref_t aco = microkit_cothread_spawn(&aco_init_entry, (void *) ACO_ID);
 
-    // Any init
+    if (microkit_cothread_spawn(&pco_entry, (void *) 3) != LIBMICROKITCO_NULL_HANDLE) {
+        microkit_dbg_puts("ERR: was able to spawn more cothreads than allowed\n");
+        return;
+    }
 
+    status->pco_cothread_ref = pco;
+    status->aco_cothread_ref = aco;
+
+    microkit_cothread_yieldto(pco); 
+    microkit_cothread_destroy(pco);
+    microkit_cothread_ref_t post_pco = microkit_cothread_spawn(&pco_entry, (void *) PCO_ID);
+
+    if (!(pco == post_pco)) {
+        microkit_dbg_puts("ERROR: pCo cothread_ref mismatch!\n");
+    }
+
+    status->pco_status = READY;
+
+    microkit_cothread_yieldto(aco);
+    microkit_cothread_destroy(aco);
+    microkit_cothread_ref_t post_aco = microkit_cothread_spawn(&aco_entry, (void *) ACO_ID);
+
+    if (!(aco == post_aco)) {
+        microkit_dbg_puts("ERROR: aCo cothread_ref mismatch!\n");
+    }
+
+    status->aco_status = READY;
+
+    microkit_notify(SPD_FINISH_INIT_CH_ID);
 }
 
 microkit_msginfo protected(microkit_channel channel, microkit_msginfo msginfo) {
@@ -92,39 +175,50 @@ microkit_msginfo protected(microkit_channel channel, microkit_msginfo msginfo) {
 void notified(microkit_channel ch) {
     switch (ch) {
         case SPD_CH_ID: { 
-            /* Basically we also need to restore the aCo registers before we switch to it. */
-            /* This could either be when it finishes reading messages */
-            /* Or when it is scheduled after pCo*/
+            // // If first time running, save pCo SP (which is SP after it finished init)
+            // if (first_run) {
+            //     status->pco_sp_after_init = microkit_get_cothread_sp(status->pco_cothread_ref);
+            //     first_run = 0;
+            // }
+            #if ENABLE_CCNT
+            SEL4BENCH_READ_CCNT(start);
+            #endif
+
+            microkit_dbg_puts("uPD 2 notified from sPD\n");
+
 
             /* If aCo in CS and reading, switch to aCo */
-            if (aco_status->critical_section) {
+            if (status->critical_section) {
                 /* Set preempted flag so aCo yield after reading message */
-                aco_status->preempted = 1; 
-                microkit_cothread_yieldto(aco_status->cothread_ref);
+                status->preempted = 1; 
+                microkit_cothread_yieldto(status->aco_cothread_ref);
             }
 
-            /* Spawn pCo */
-            microkit_cothread_ref_t pco = microkit_cothread_spawn(pco_status->entry_point, PCO_ID);
-            pco_status->cothread_ref = pco;
-            pco_status->status = ready;
-
             /* Run periodic application code */
-            pco_status->status = RUNNING;
-            microkit_cothread_yieldto(pco_status->cothread_ref);
-            /* Destroy pCo upon finish */
-            microkit_cothread_destroy(pco_status->cothread_ref);
-            /* Check if pCo was recoverying */
-            if (pco_status->status == RECOVER) { 
+            status->pco_status = RUNNING;
+            #if ENABLE_CCNT
+            SEL4BENCH_READ_CCNT(end);
+            print_cycle(start, end, 'U');
+            #endif
+            microkit_cothread_yieldto(status->pco_cothread_ref);
+            /* Check if pCo was recovering */
+            if (status->pco_status == RECOVER) { 
+                status->pco_status = READY;
                 /* Unblock the sPD */
                 break;
             }
+            status->pco_status = READY;
+            microkit_dbg_puts("After pCo P2\n");
 
             /* Back from periodic, run aperiodic */
-            aco_status->status = RUNNING;
-            microkit_cothread_yieldto(aco_status->cothread_ref);
+            status->aco_status = RUNNING;
+            microkit_cothread_yieldto(status->aco_cothread_ref);
+            microkit_dbg_puts("After aCo P2\n");
 
             /* After aCo handling, set status to ready, and block on notification */
-            aco_status->status = READY;
+            status->aco_status = READY;
+
+            microkit_dbg_puts("uPD Finish\n");
 
             break;
         }

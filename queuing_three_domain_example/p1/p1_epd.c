@@ -1,12 +1,8 @@
 #include "p1.h"
-#include "p1_config.h"
-
-#define SPD_ID 1
-#define UPD_ID 2
+#include "epd_shared.h"
 
 #define SCHEDULER_CH_ID 1
 #define SCHEDULER_REBIND_CHANNEL 2
-#define UPD_CH_ID 8
 
 /* PARTITION INFO */
 
@@ -19,14 +15,14 @@ seL4_UserContext *pco_ctxt;
 int init_finished = 0;
 
 void init(void) {
-    sddf_dprintf("In ePD 1 init\n");
+    printf("In ePD 1 init\n");
 };
 
 void notified(microkit_channel ch) {
     switch (ch) {
         /* Handling pCo overruns */
         case SPD_CH_ID: {
-            if (pco_status->status == RUNNING) { 
+            if (upd_status->pco_status == RUNNING) { 
                 printf("Starting uPD recovery!\n");
 
                 partition_state->state = RECOVER;
@@ -39,13 +35,13 @@ void notified(microkit_channel ch) {
 
 
                 /* Resume uPD TCB */
-                seL4_TCB_Resume(UPD_TCB_ID);
+                seL4_TCB_Resume(BASE_TCB_CAP + UPD_TCB_ID);
 
-                return;
+                break;
 
-            } else if (pco_status == RECOVER) {
+            } else if (upd_status->pco_status == RECOVER) {
                 /* If already recovering, just let uPD continue */
-                seL4_TCB_Resume(UPD_TCB_ID);
+                seL4_TCB_Resume(BASE_TCB_CAP + UPD_TCB_ID);
                 printf("Continuing uPD recovery!\n");
                 break;
 
@@ -60,15 +56,14 @@ void notified(microkit_channel ch) {
         }
 
         case UPD_CH_ID: {
+            // printf("ePD restoring uPD register\n");
             /* Restore aCo registers */
-            seL4_TCB_WriteRegisters(BASE_TCB_CAP + UPD_ID, seL4_False, 0, NUM_REG_SAVE, pco_ctxt); 
+            // seL4_TCB_WriteRegisters(BASE_TCB_CAP + UPD_TCB_ID, seL4_False, 0, NUM_REG_SAVE, pco_ctxt); 
+            microkit_pd_restart(UPD_TCB_ID, (seL4_Word) upd_status->pco_entry_point);
             break;
         }
   
     }
 };
 
-seL4_Bool fault(microkit_child child, microkit_msginfo msginfo, microkit_msginfo *reply_msginfo) {
-    return seL4_False;
-}
 

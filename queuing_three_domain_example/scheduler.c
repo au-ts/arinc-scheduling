@@ -1,5 +1,6 @@
 #include "partition.h"
 #include <stdint.h>
+#include "printf.h"
 #include <microkit.h>
 #include <sddf/timer/client.h>
 #include <sddf/util/printf.h>
@@ -11,17 +12,15 @@
 #define P2_SPD_CH_ID 3
 #define P3_SPD_CH_ID 4
 
-#define BASE_PARTITION_TCB_ID 1
-#define P1_UPD_TCB_ID 1
-#define P2_UPD_TCB_ID 2
-#define P3_UPD_TCB_ID 3
+#define BASE_PD_TCB_CAP 202
+#define BASE_TCB_ID_CAP BASE_PD_TCB_CAP + 1
 
 #define NUM_PARTITIONS 3
 
 /* Partition specific */
-#define P1_LEN 100 * NS_IN_MS
-#define P2_LEN 100 * NS_IN_MS
-#define P3_LEN 100 * NS_IN_MS
+#define P1_LEN 2000 * NS_IN_MS
+#define P2_LEN 2000 * NS_IN_MS
+#define P3_LEN 2000 * NS_IN_MS
 
 partition_internal *p1_state;
 partition_internal *p2_state;
@@ -38,13 +37,16 @@ PARTITION_ATTR_t *partition_info_list[NUM_PARTITIONS] = {0};
 uint64_t plist_head = 0;
 
 int init_finished = 0;
+int first_dispatch_done = 0;
 
 uint64_t get_next_partition_idx(void) {
-    return plist_head++ % NUM_PARTITIONS;
+	uint64_t next = plist_head % NUM_PARTITIONS;
+	plist_head = (plist_head + 1) % NUM_PARTITIONS;
+	return next;
 }
 
 uint64_t get_curr_partition_idx(void) {
-    return plist_head % NUM_PARTITIONS;
+	return (plist_head + NUM_PARTITIONS - 1) % NUM_PARTITIONS;
 }
 
 /* Current time allocated for initialisation timeout */
@@ -60,7 +62,7 @@ void setup_partition_config(void) {
 
     /* Set partitions states / info */
     for (int i = 0; i < NUM_PARTITIONS; ++i) {
-        set_partition_state(partition_state_list[i], INIT);
+        partition_state_list[i]->state = INIT;
     }
 
     p1_attr->LENGTH = P1_LEN;
@@ -76,6 +78,7 @@ void setup_partition_config(void) {
 }
 
 void init(void) {
+    // sel4bench_init();
     
     setup_partition_config();
 
@@ -84,6 +87,8 @@ void init(void) {
     for (int i = 0; i < NUM_PARTITIONS; ++i) {
         curr_init += partition_info_list[i]->LENGTH;
     }
+
+    // curr_init *= 10;
 
     /* Register timer interrupt for init */
     
@@ -112,19 +117,29 @@ void notified(microkit_channel ch)
                 }
             }
             /* Set flag once finished */
+            microkit_dbg_puts("INIT FINISHED\n");
             init_finished = 1;
         }
 
         /* Normal operation (init complete )*/
 
         int curr_partition = get_curr_partition_idx();
+        // printf("Curr partition: %d\n", curr_partition);
 
         /* TCB suspend current (previous) partition */
-        seL4_TCB_Suspend(BASE_PARTITION_TCB_ID + curr_partition);
+        if (first_dispatch_done) {
+            printf("Suspending partition: %d\n", curr_partition);
+            // printf("TCB : %d\n", BASE_TCB_ID_CAP + curr_partition);
+            seL4_TCB_Suspend(BASE_TCB_ID_CAP + curr_partition);
+        } else {
+            first_dispatch_done = 1;
+        }
 
         int next_partition = get_next_partition_idx();
+        // printf("next partition: %d\n", next_partition);
         partition_state_list[next_partition]->state = RUNNING; 
         /* Notify partition channels */
+        printf("Notify : %d\n", PARTITION_CHANNEL_START + next_partition);
         microkit_notify(next_partition + PARTITION_CHANNEL_START);
         sddf_timer_set_timeout(TIMER_CH_ID, partition_info_list[next_partition]->LENGTH);
         break;

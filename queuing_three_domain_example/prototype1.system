@@ -3,10 +3,14 @@
 
 <system>
 
+<!-- <memory_region name="timer_registers" size="0x10_000" phys_addr="0xffd0f000" /> -->
+
 <protection_domain name="timer" priority="254">
     <program_image path="timer_driver.elf" />
     <!-- <map mr="timer" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="timer_regs" /> -->
     <irq irq="30" id="0" />
+    <!-- <map mr="timer_registers" vaddr="0x2_000_000" perms="rw" cached="false" setvar_vaddr="gpt_regs" /> -->
+    <!-- <irq irq="42" id="0" trigger="edge" /> timer interrupt for timer A -->
 </protection_domain>
 
   
@@ -26,6 +30,8 @@
 
 </protection_domain>
 
+<memory_region name="uart" size="0x1_000" phys_addr="0xff803000" />
+
 <!-- Partition states -->
 
 <memory_region name="p1_state" size="0x1_000" />
@@ -39,9 +45,21 @@
 
 <!-- Application states -->
 
-<memory_region name="p1_aco_regs" size="0x1_000" />
-<memory_region name="p2_aco_regs" size="0x1_000" />
-<memory_region name="p3_aco_regs" size="0x1_000" />
+<memory_region name="p1_pco_stack" size="0x1_000" />
+<memory_region name="p1_aco_stack" size="0x1_000" />
+
+<memory_region name="p2_pco_stack" size="0x1_000" />
+<memory_region name="p2_aco_stack" size="0x1_000" />
+
+<memory_region name="p3_pco_stack" size="0x1_000" />
+<memory_region name="p3_aco_stack" size="0x1_000" />
+
+<memory_region name="p1_aco_ctxt" size="0x1_000" />
+<memory_region name="p2_aco_ctxt" size="0x1_000" />
+<memory_region name="p3_aco_ctxt" size="0x1_000" />
+<memory_region name="p1_pco_ctxt" size="0x1_000" />
+<memory_region name="p2_pco_ctxt" size="0x1_000" />
+<memory_region name="p3_pco_ctxt" size="0x1_000" />
 
 <memory_region name="p1_upd_state" size="0x1_000" />
 <memory_region name="p2_upd_state" size="0x1_000" />
@@ -65,89 +83,116 @@
 <!-- Partition PDs -->
 
 <!-- NEW P1 -->
-<protection_domain name="p1_epd" passive="true" priority="252">
+<protection_domain name="p1_epd" passive="true" priority="250">
     <program_image path="p1_epd.elf" /> 
-    <map mr="p1_aco_regs" vaddr="0x10_000_000" perms="rw" setvar_vaddr="aco_regs" />
+    <map mr="p1_state" vaddr="0x10_000_000" perms="rw" setvar_vaddr="partition_state" />
+    <map mr="p1_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="upd_status" />
+    <map mr="p1_pco_ctxt" vaddr="0x10_002_000" perms="rw" setvar_vaddr="pco_ctxt" />
+
     <tcb pd_name="p1_upd" id="1" />
 </protection_domain>
 
-<protection_domain name="p1_spd" passive="true" priority="100" budget="100" period="300" id="1">
+<protection_domain name="p1_spd" passive="true" priority="200" budget="1000" period="6000">
         <program_image path="p1_spd.elf" />
-        <map mr="p1_state" vaddr="0x10_000_000" perms="rw" setvar_vaddr="P_STATE" />
-        <map mr="p1_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="PPD_STATUS" />
+        <map mr="p1_state" vaddr="0x10_000_000" perms="rw" setvar_vaddr="partition_state" />
+        <map mr="p1_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="upd_status" />
+        <map mr="p1_pco_ctxt" vaddr="0x10_002_000" perms="rw" setvar_vaddr="pco_ctxt" />
+        <map mr="p1_aco_ctxt" vaddr="0x10_003_000" perms="rw" setvar_vaddr="aco_ctxt" />
 
-        <map mr="p1_to_p2_port" vaddr="0x10_002_000" perms="rw" setvar_vaddr="SEND_P2_PORT" />
-        <map mr="p1_broadcast_port" vaddr="0x10_003_000" perms="rw" setvar_vaddr="SEND_ALL_PORT" />
+        <map mr="uart" vaddr="0x10_004_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
+
+        <!-- <map mr="p1_to_p2_port" vaddr="0x10_002_000" perms="rw" setvar_vaddr="SEND_P2_PORT" /> -->
+        <!-- <map mr="p1_broadcast_port" vaddr="0x10_003_000" perms="rw" setvar_vaddr="SEND_ALL_PORT" /> -->
         <tcb pd_name="p1_upd" id="1" />
 </protection_domain>
 
-<protection_domain name="p1_upd" passive="true" priority="99" budget="150" period="450" id="2">
+<protection_domain name="p1_upd" passive="true" priority="102" budget="1000" period="6000">
         <program_image path="p1_upd.elf" />
-        <map mr="p1_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="STATUS" />
+        <map mr="p1_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="status" />
+        <map mr="p1_pco_stack" vaddr="0x10_002_000" perms="rw" setvar_vaddr="pco_stack" />
+        <map mr="p1_aco_stack" vaddr="0x10_003_000" perms="rw" setvar_vaddr="aco_stack" />
 
-        <map mr="p1_to_p2_port" vaddr="0x10_002_000" perms="rw" setvar_vaddr="P2_PORT" />
-        <map mr="p1_broadcast_port" vaddr="0x10_003_000" perms="rw" setvar_vaddr="BROADCAST_PORT" />
+        <!-- <map mr="p1_to_p2_port" vaddr="0x10_002_000" perms="rw" setvar_vaddr="P2_PORT" /> -->
+        <!-- <map mr="p1_broadcast_port" vaddr="0x10_003_000" perms="rw" setvar_vaddr="BROADCAST_PORT" /> -->
 </protection_domain>
 <!-- End New P1 -->
 
 <!-- NEW P2 -->
-<protection_domain name="p2_epd" passive="true" priority="252">
+<protection_domain name="p2_epd" passive="true" priority="250">
     <program_image path="p2_epd.elf" /> 
-    <map mr="p2_aco_regs" vaddr="0x10_000_000" perms="rw" setvar_vaddr="aco_regs" />
+    <map mr="p2_state" vaddr="0x10_000_000" perms="rw" setvar_vaddr="partition_state" />
+    <map mr="p2_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="upd_status" />
+    <map mr="p2_pco_ctxt" vaddr="0x10_002_000" perms="rw" setvar_vaddr="pco_ctxt" /> 
+
     <tcb pd_name="p2_upd" id="1" />
 </protection_domain>
 
-<protection_domain name="p2_spd" passive="true" priority="100" budget="100" period="300" id="1">
+<protection_domain name="p2_spd" passive="true" priority="200" budget="1000" period="6000">
         <program_image path="p2_spd.elf" />
-        <map mr="p2_state" vaddr="0x10_000_000" perms="rw" setvar_vaddr="P_STATE" />
-        <map mr="p2_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="PPD_STATUS" />
+        <map mr="p2_state" vaddr="0x10_000_000" perms="rw" setvar_vaddr="partition_state" />
+        <map mr="p2_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="upd_status" />
+        <map mr="p2_pco_ctxt" vaddr="0x10_002_000" perms="rw" setvar_vaddr="pco_ctxt" />
+        <map mr="p2_aco_ctxt" vaddr="0x10_003_000" perms="rw" setvar_vaddr="aco_ctxt" />
 
-        <map mr="p1_to_p2_port" vaddr="0x10_002_000" perms="rw" setvar_vaddr="SEND_P2_PORT" />
-        <map mr="p1_broadcast_port" vaddr="0x10_003_000" perms="rw" setvar_vaddr="SEND_ALL_PORT" />
-        <tcb pd_name="p2_upd" id="1" />
+        <map mr="uart" vaddr="0x10_004_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
+
+        <!-- <map mr="p1_to_p2_port" vaddr="0x10_002_000" perms="rw" setvar_vaddr="SEND_P2_PORT" /> -->
+        <!-- <map mr="p1_broadcast_port" vaddr="0x10_003_000" perms="rw" setvar_vaddr="SEND_ALL_PORT" /> -->
+        <tcb pd_name="p2_upd" id="2" />
 </protection_domain>
 
-<protection_domain name="p1_upd" passive="true" priority="99" budget="150" period="450" id="2">
-        <program_image path="p1_upd.elf" />
-        <map mr="p1_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="STATUS" />
-
-        <map mr="p1_to_p2_port" vaddr="0x10_002_000" perms="rw" setvar_vaddr="P2_PORT" />
-        <map mr="p1_broadcast_port" vaddr="0x10_003_000" perms="rw" setvar_vaddr="BROADCAST_PORT" />
+<protection_domain name="p2_upd" passive="true" priority="101" budget="1000" period="6000">
+        <program_image path="p2_upd.elf" />
+        <map mr="p2_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="status" />
+        <map mr="p2_pco_stack" vaddr="0x10_002_000" perms="rw" setvar_vaddr="pco_stack" />
+        <map mr="p2_aco_stack" vaddr="0x10_003_000" perms="rw" setvar_vaddr="aco_stack" />
+        <!-- <map mr="p1_to_p2_port" vaddr="0x10_002_000" perms="rw" setvar_vaddr="P2_PORT" /> -->
+        <!-- <map mr="p1_broadcast_port" vaddr="0x10_003_000" perms="rw" setvar_vaddr="BROADCAST_PORT" /> -->
+        <map mr="uart" vaddr="0x10_004_000" perms="rw" cached="false" setvar_vaddr="uart_base" />
 
     </protection_domain>
 <!-- End New P2 -->
 
 <!-- New P3 -->
-<protection_domain name="p3_epd" passive="true" priority="252">
+<protection_domain name="p3_epd" passive="true" priority="250">
     <program_image path="p3_epd.elf" /> 
-    <map mr="p3_aco_regs" vaddr="0x10_000_000" perms="rw" setvar_vaddr="aco_regs" />
+    <map mr="p3_state" vaddr="0x10_000_000" perms="rw" setvar_vaddr="partition_state" />
+    <map mr="p3_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="upd_status" />
+    <map mr="p3_pco_ctxt" vaddr="0x10_002_000" perms="rw" setvar_vaddr="pco_ctxt" /> 
+
     <tcb pd_name="p3_upd" id="1" />
 </protection_domain>
 
-<protection_domain name="p3_spd" passive="true" priority="99" budget="100" period="300">
+<protection_domain name="p3_spd" passive="true" priority="200" budget="1000" period="6000">
     <program_image path="p3_spd.elf" />
-    <map mr="p3_state" vaddr="0x10_000_000" perms="rw" setvar_vaddr="P_STATE" />
-    <map mr="p3_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="PPD_STATUS" />
+    <map mr="p3_state" vaddr="0x10_000_000" perms="rw" setvar_vaddr="partition_state" />
+    <map mr="p3_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="upd_status" />
+    <map mr="p3_pco_ctxt" vaddr="0x10_002_000" perms="rw" setvar_vaddr="pco_ctxt" />
+    <map mr="p3_aco_ctxt" vaddr="0x10_003_000" perms="rw" setvar_vaddr="aco_ctxt" />
 
+    <tcb pd_name="p3_upd" id="1" />
+<!-- 
     <map mr="p2_to_p3_port" vaddr="0x10_002_000" perms="rw" setvar_vaddr="P2_SEND_PORT" />
     <map mr="p1_broadcast_port" vaddr="0x10_003_000" perms="r" setvar_vaddr="P1_BROADCAST_PORT" />
 
     <map mr="p3_p2_recv_port" vaddr="0x10_004_000" perms="rw" setvar_vaddr="P2_RECV" />
-    <map mr="p3_p1_broadcast_recv_port" vaddr="0x10_005_000" perms="rw" setvar_vaddr="P1_BROADCAST_RECV" />
+    <map mr="p3_p1_broadcast_recv_port" vaddr="0x10_005_000" perms="rw" setvar_vaddr="P1_BROADCAST_RECV" /> -->
 </protection_domain>
 
-<protection_domain name="p3_upd" passive="true" priority="100">
+<protection_domain name="p3_upd" passive="true" priority="100" budget="1000" period="6000">
     <program_image path="p3_upd.elf" />
-    <map mr="p3_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="STATUS" />
+    <map mr="p3_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="status" />
+    <map mr="p3_pco_stack" vaddr="0x10_002_000" perms="rw" setvar_vaddr="pco_stack" />
+    <map mr="p3_aco_stack" vaddr="0x10_003_000" perms="rw" setvar_vaddr="aco_stack" />
 
-    <map mr="p3_p2_recv_port" vaddr="0x10_002_000" perms="rw" setvar_vaddr="P2_RECV" />
-    <map mr="p3_p1_broadcast_recv_port" vaddr="0x10_003_000" perms="r" setvar_vaddr="P1_BROADCAST_RECV" />
+    <!-- <map mr="p3_p2_recv_port" vaddr="0x10_002_000" perms="rw" setvar_vaddr="P2_RECV" />
+    <map mr="p3_p1_broadcast_recv_port" vaddr="0x10_003_000" perms="r" setvar_vaddr="P1_BROADCAST_RECV" /> -->
 </protection_domain>
 <!-- End New P3 -->
 
-<protection_domain name="p1_ppd" passive="true" priority="100">
+<!-- <protection_domain name="p1_ppd" passive="true" priority="100">
     <program_image path="p1_ppd.elf" />
-    <map mr="p1_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="STATUS" />
+    <map mr="p1_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="status" />
 
     <map mr="p1_to_p2_port" vaddr="0x10_002_000" perms="rw" setvar_vaddr="P2_PORT" />
     <map mr="p1_broadcast_port" vaddr="0x10_003_000" perms="rw" setvar_vaddr="BROADCAST_PORT" />
@@ -156,8 +201,8 @@
 
 <protection_domain name="p1_spd" passive="true" priority="99" budget="100" period="300">
     <program_image path="p1_spd.elf" />
-    <map mr="p1_state" vaddr="0x10_000_000" perms="rw" setvar_vaddr="P_STATE" />
-    <map mr="p1_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="PPD_STATUS" />
+    <map mr="p1_state" vaddr="0x10_000_000" perms="rw" setvar_vaddr="partition_state" />
+    <map mr="p1_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="upd_status" />
 
     <map mr="p1_to_p2_port" vaddr="0x10_002_000" perms="rw" setvar_vaddr="SEND_P2_PORT" />
     <map mr="p1_broadcast_port" vaddr="0x10_003_000" perms="rw" setvar_vaddr="SEND_ALL_PORT" />
@@ -165,7 +210,7 @@
 
 <protection_domain name="p2_ppd" passive="true" priority="100">
     <program_image path="p2_ppd.elf" />
-    <map mr="p2_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="STATUS" />
+    <map mr="p2_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="status" />
 
     <map mr="p2_to_p3_port" vaddr="0x10_002_000" perms="rw" setvar_vaddr="P3_PORT" />
 
@@ -175,8 +220,8 @@
 
 <protection_domain name="p2_spd" passive="true" priority="99" budget="100" period="300">
     <program_image path="p2_spd.elf" />
-    <map mr="p2_state" vaddr="0x10_000_000" perms="rw" setvar_vaddr="P_STATE" />
-    <map mr="p2_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="PPD_STATUS" />
+    <map mr="p2_state" vaddr="0x10_000_000" perms="rw" setvar_vaddr="partition_state" />
+    <map mr="p2_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="upd_status" />
 
     <map mr="p1_to_p2_port" vaddr="0x10_002_000" perms="r" setvar_vaddr="P1_SEND_PORT" />
     <map mr="p1_broadcast_port" vaddr="0x10_003_000" perms="r" setvar_vaddr="P1_BROADCAST_PORT" />
@@ -189,8 +234,8 @@
 
 <protection_domain name="p3_spd" passive="true" priority="99" budget="100" period="300">
     <program_image path="p3_spd.elf" />
-    <map mr="p3_state" vaddr="0x10_000_000" perms="rw" setvar_vaddr="P_STATE" />
-    <map mr="p3_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="PPD_STATUS" />
+    <map mr="p3_state" vaddr="0x10_000_000" perms="rw" setvar_vaddr="partition_state" />
+    <map mr="p3_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="upd_status" />
 
     <map mr="p2_to_p3_port" vaddr="0x10_002_000" perms="rw" setvar_vaddr="P2_SEND_PORT" />
     <map mr="p1_broadcast_port" vaddr="0x10_003_000" perms="r" setvar_vaddr="P1_BROADCAST_PORT" />
@@ -201,12 +246,12 @@
 
 <protection_domain name="p3_ppd" passive="true" priority="100">
     <program_image path="p3_ppd.elf" />
-    <map mr="p3_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="STATUS" />
+    <map mr="p3_upd_state" vaddr="0x10_001_000" perms="rw" setvar_vaddr="status" />
 
     <map mr="p3_p2_recv_port" vaddr="0x10_002_000" perms="rw" setvar_vaddr="P2_RECV" />
     <map mr="p3_p1_broadcast_recv_port" vaddr="0x10_003_000" perms="r" setvar_vaddr="P1_BROADCAST_RECV" />
 </protection_domain>
-
+ -->
 <!-- Channels -->
 
 <!-- Timer-Scheduler -->
@@ -245,49 +290,82 @@
 
 <!-- sPD-ePD -->
 <channel> 
-    <end pd="p1_spd" id="3" pp="true" notify="true" />
+    <end pd="p1_spd" id="3" pp="false" notify="true" />
     <end pd="p1_epd" id="1" pp="false" notify="false"/>
 </channel>
 
 <channel> 
-    <end pd="p2_spd" id="3" pp="true" notify="true" />
+    <end pd="p2_spd" id="3" pp="false" notify="true" />
     <end pd="p2_epd" id="1" pp="false" notify="false"/>
 </channel>
 
 <channel> 
-    <end pd="p3_spd" id="3" pp="true" notify="true" />
+    <end pd="p3_spd" id="3" pp="false" notify="true" />
     <end pd="p3_epd" id="1" pp="false" notify="false"/>
 </channel>
 
 <!-- sPD-UPD -->
 <channel> 
-    <end pd="p1_spd" id="4" pp="true" notify="false" />
-    <end pd="p1_upd" id="1" pp="false" notify="false"/>
+    <end pd="p1_spd" id="4" pp="false" notify="true" />
+    <end pd="p1_upd" id="1" pp="false" notify="true"/>
 </channel>
 
 <channel> 
-    <end pd="p2_spd" id="4" pp="true" notify="false" />
-    <end pd="p2_upd" id="1" pp="false" notify="false"/>
+    <end pd="p2_spd" id="4" pp="false" notify="true" />
+    <end pd="p2_upd" id="1" pp="false" notify="true"/>
 </channel>
 
 <channel> 
-    <end pd="p3_spd" id="4" pp="true" notify="false" />
-    <end pd="p3_upd" id="1" pp="false" notify="false"/>
+    <end pd="p3_spd" id="4" pp="false" notify="true" />
+    <end pd="p3_upd" id="1" pp="false" notify="true"/>
 </channel>
 
 <!-- ePD-uPD -->
 <channel>
     <end pd="p1_epd" id="2" pp="false" notify="true" />
-    <end pd="p1_upd" id="2" pp="true" notify="true" />
+    <end pd="p1_upd" id="2" pp="false" notify="true" />
 </channel>
 
 <channel>
     <end pd="p2_epd" id="2" pp="false" notify="true" />
-    <end pd="p2_upd" id="2" pp="true" notify="true" />
+    <end pd="p2_upd" id="2" pp="false" notify="true" />
 </channel>
 
 <channel>
-    <end pd="p2_epd" id="2" pp="false" notify="true" />
-    <end pd="p2_upd" id="2" pp="true" notify="true" />
+    <end pd="p3_epd" id="2" pp="false" notify="true" />
+    <end pd="p3_upd" id="2" pp="false" notify="true" />
 </channel>
+
+<!-- sPD-uPD Init -->
+<channel>
+    <end pd="p1_spd" id="5" pp="false" notify="false" />
+    <end pd="p1_upd" id="3" pp="false" notify="true"/>
+</channel>
+
+<channel>
+    <end pd="p2_spd" id="5" pp="false" notify="false" />
+    <end pd="p2_upd" id="3" pp="false" notify="true"/>
+</channel>
+
+<channel>
+    <end pd="p3_spd" id="5" pp="false" notify="false" />
+    <end pd="p3_upd" id="3" pp="false" notify="true"/>
+</channel>
+
+<!-- sPD-uPD Finish Init -->
+<channel>
+    <end pd="p1_spd" id="6" pp="false" notify="false" />
+    <end pd="p1_upd" id="4" pp="false" notify="true"/>
+</channel>
+
+<channel>
+    <end pd="p2_spd" id="6" pp="false" notify="false" />
+    <end pd="p2_upd" id="4" pp="false" notify="true"/>
+</channel>
+
+<channel>
+    <end pd="p3_spd" id="6" pp="false" notify="false" />
+    <end pd="p3_upd" id="4" pp="false" notify="true"/>
+</channel>
+
 </system>

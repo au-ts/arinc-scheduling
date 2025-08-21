@@ -15,7 +15,7 @@ ifndef TOOLCHAIN
 endif
 
 TARGET := aarch64-unknown-linux-gnu
-TOOLCHAIN := $(TARGET)
+TOOLCHAIN ?= $(TARGET)
 CC := $(TOOLCHAIN)-gcc
 LD := $(TOOLCHAIN)-ld
 AS := $(TOOLCHAIN)-as
@@ -23,10 +23,13 @@ AR := $(TOOLCHAIN)-ar
 RANLIB := $(TOOLCHAIN)-ranlib
 
 
-export LIBMICROKITCO_PATH TARGET MICROKIT_SDK BUILD_DIR MICROKIT_BOARD MICROKIT_CONFIG CPU TOOLCHAIN
+# libmicrokitco archive location inside the build directory
+LIBMICROKITCO_OBJ := libmicrokitco/libmicrokitco_$(TARGET).a
+export LIBMICROKITCO_PATH LIBMICROKITCO_OPT_PATH LIBMICROKITCO_OBJ MICROKIT_SDK BUILD_DIR MICROKIT_BOARD MICROKIT_CONFIG CPU TOOLCHAIN TARGET
 
 $(LIBMICROKITCO_OBJ):
-	make -f $(LIBMICROKITCO_PATH)/Makefile
+	make -f $(LIBMICROKITCO_PATH)/Makefile TARGET=$(TARGET) BUILD_DIR=.
+	mv libmicrokitco/libmicrokitco.a $(LIBMICROKITCO_OBJ)
 
 
 TIMER_DRIVER := $(SDDF)/drivers/timer/$(TIMER_DRIVER_DIR)
@@ -34,9 +37,9 @@ TIMER_DRIVER := $(SDDF)/drivers/timer/$(TIMER_DRIVER_DIR)
 include ${TIMER_DRIVER}/timer_driver.mk
 include ${SDDF}/util/util.mk
 
-IMAGES := p1_upd.elf p1_spd.elf p2_ppd.elf p2_spd.elf p3_ppd.elf p3_spd.elf scheduler.elf timer_driver.elf
+IMAGES := p1_epd.elf p2_epd.elf p3_epd.elf p1_upd.elf p1_spd.elf p2_upd.elf p2_spd.elf p3_upd.elf p3_spd.elf scheduler.elf timer_driver.elf
 # Note that these warnings being disabled is to avoid compilation errors while in the middle of completing each exercise part
-CFLAGS := -mcpu=$(CPU) -mstrict-align -nostdlib -ffreestanding -g -Wall -Wno-array-bounds -Wno-unused-variable -Wno-unused-function -Werror -I$(BOARD_DIR)/include -I$(SDDF)/include -Iinclude -DBOARD_$(BOARD)
+CFLAGS := -mcpu=$(CPU) -mstrict-align -nostdlib -ffreestanding -g -Wall -Wno-array-bounds -Wno-unused-variable -Wno-unused-function -Werror -I$(BOARD_DIR)/include -I$(SDDF)/include -Iinclude -DBOARD_$(MICROKIT_BOARD) -I$(LIBMICROKITCO_PATH) -I$(LIBMICROKITCO_OPT_PATH)
 LDFLAGS := -L$(BOARD_DIR)/lib
 LIBS := -lmicrokit -Tmicrokit.ld libsddf_util_debug.a
 
@@ -74,17 +77,21 @@ qemu: $(IMAGE_FILE)
 %.o: ../p3/%.c Makefile
 	$(CC) -c $(CFLAGS) $< -o $@
 
-PRINTF_OBJS := printf.o util.o
-INTERPARTITION_COMM_OBJS := $(PRINTF_OBJS) interpartitioncomm.o 
+PRINTF_OBJS := printf.o util.o string.o
+INTERPARTITION_COMM_OBJS := $(PRINTF_OBJS) interpartitioncomm.o ${LIBMICROKITCO_OBJ}
 P1_USER_OBJS := $(INTERPARTITION_COMM_OBJS) p1_user.o p1_upd.o
-P2_USER_OBJS := $(INTERPARTITION_COMM_OBJS) p2_user.o p2_ppd.o
-P3_USER_OBJS := $(INTERPARTITION_COMM_OBJS) p3_user.o p3_ppd.o
+P2_USER_OBJS := $(INTERPARTITION_COMM_OBJS) p2_user.o p2_upd.o
+P3_USER_OBJS := $(INTERPARTITION_COMM_OBJS) p3_user.o p3_upd.o
 
 P1_SPD_OBJS := $(INTERPARTITION_COMM_OBJS) p1_spd.o
 P2_SPD_OBJS := $(INTERPARTITION_COMM_OBJS) p2_spd.o
 P3_SPD_OBJS := $(INTERPARTITION_COMM_OBJS) p3_spd.o
 
-PARTITION_OBJS := $(PRINTF_OBJS) partition.o
+P1_EPD_OBJS := ${INTERPARTITION_COMM_OBJS} p1_epd.o
+P2_EPD_OBJS := ${INTERPARTITION_COMM_OBJS} p2_epd.o
+P3_EPD_OBJS := ${INTERPARTITION_COMM_OBJS} p3_epd.o
+
+PARTITION_OBJS := $(PRINTF_OBJS) ${LIBMICROKITCO_OBJ} partition.o
 SCHEDULER_OBJS := $(PARTITION_OBJS) scheduler.o
 SYSTEM_FILE := ${TOP}/prototype1.system
 
@@ -105,21 +112,30 @@ p1_upd.elf: $(P1_USER_OBJS) $(LIBMICROKITCO_OBJ)
 p1_spd.elf: $(P1_SPD_OBJS)
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
+p1_epd.elf: $(P1_EPD_OBJS)
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
 
 # P2 #
 
-p2_ppd.elf: $(P2_USER_OBJS)
+p2_upd.elf: $(P2_USER_OBJS) $(LIBMICROKITCO_OBJ)
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 p2_spd.elf: $(P2_SPD_OBJS)
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
+p2_epd.elf: $(P2_EPD_OBJS)
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
 # P3 #
 
-p3_ppd.elf: $(P3_USER_OBJS)
+p3_upd.elf: $(P3_USER_OBJS) $(LIBMICROKITCO_OBJ)
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 p3_spd.elf: $(P3_SPD_OBJS)
+	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
+
+p3_epd.elf: $(P3_EPD_OBJS)
 	$(LD) $(LDFLAGS) $^ $(LIBS) -o $@
 
 

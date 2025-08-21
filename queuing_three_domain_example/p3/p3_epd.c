@@ -1,4 +1,4 @@
-#include "p2.h"
+#include "p3.h"
 #include "epd_shared.h"
 
 #define SCHEDULER_CH_ID 1
@@ -15,7 +15,7 @@ seL4_UserContext *pco_ctxt;
 int init_finished = 0;
 
 void init(void) {
-    printf("In ePD 2 init\n");
+    printf("In ePD 3 init\n");
 };
 
 void notified(microkit_channel ch) {

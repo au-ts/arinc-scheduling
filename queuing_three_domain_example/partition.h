@@ -1,6 +1,20 @@
 #pragma once
 
 #include <stdint.h>
+#include <libmicrokitco.h>
+#include <sddf/benchmark/sel4bench.h>
+// #if defined(__has_include)
+// #  if __has_include(<libmicrokitco.h>)
+// #    include <libmicrokitco.h>
+// #  else
+//      typedef int microkit_cothread_ref_t;
+// #  endif
+// #else
+// #  include <libmicrokitco.h>
+// #endif
+#ifndef ENABLE_CCNT
+#define ENABLE_CCNT 0
+#endif
 
 // All registers except thread ID
 #define NUM_REG_SAVE (sizeof(seL4_UserContext)/sizeof(seL4_Word)) - 2 
@@ -35,7 +49,6 @@ typedef struct {
     PARTITION_STATE_TYPE upd_state;
 } partition_internal;
 
-void set_partition_state(PARTITION_SHARED_t *partition, PARTITION_STATE_TYPE state);
 
 // // Copy of 
 // void set_tcb_pc(uint64_t tcb_id, seL4_Word pc) {

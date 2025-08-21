@@ -1,1 +1,2 @@
-const int LIBMICROKITCO_MAX_COTHREADS = 3;
+#pragma once
+#define LIBMICROKITCO_MAX_COTHREADS 3

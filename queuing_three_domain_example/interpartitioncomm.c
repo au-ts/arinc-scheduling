@@ -2,6 +2,7 @@
 #include "partition.h"
 #include "upd_types.h"
 #include "port.h"
+#include <libmicrokitco.h>
 
 void check_set_message(SAMPLING_PORT_TYPE *from, SAMPLING_PORT_TYPE *to) {
     if (from->status == VALID && from->empty == FULL) {
@@ -101,23 +102,22 @@ void transfer_queuing_buffers(QUEUING_PORT_TYPE *from, QUEUING_PORT_TYPE *to) {
     while (from->size) {
         /* Only transfer if the receiving port is not full */
         if (to->size < to->max_len) {
-            int msg = receive_queuing_message(from);
-
-            /* Not invalid message (non-empty known from loop cond.)*/
-            if (msg != ERR_MSG_INVALID) {
-                if (send_queuing_message(to, msg) != 0) {
+            QUEUE_MSG msg = from->buffer[from->head];
+            if (msg.status == VALID) {
+                if (send_queuing_message(to, msg.data) != 0) {
                     microkit_dbg_puts("Error queuing to port\n");
                     break;
                 }
-
-            }
-            else {
-                /* End transfer as we want to maintain order of messages */
+                from->buffer[from->head].status = INVALID;
+                from->buffer[from->head].data = 0;
+                from->head = (from->head + 1) % from->max_len;
+                --from->size;
+            } else {
                 break;
             }
         } else {
             /* Stop if receiving port full */
             break;
-        }    
-    } 
+        }
+    }
 }
